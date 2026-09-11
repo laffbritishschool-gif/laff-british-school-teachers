@@ -1,7 +1,162 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Teacher Login | Laff British Montessori School</title><link rel="stylesheet" href="assets/styles.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="assets/supabase.js"></script></head><body class="login"><main class="loginbox"><img src="https://i.ibb.co/whtP8S5v/image.png" alt="Laff British Montessori School"><h1>Teacher Portal</h1><p id="intro">Sign in with your school email and password.</p><div class="tabs" style="display:flex;gap:8px;margin:18px 0"><button id="signTab" class="btn primary" type="button">Sign in</button><button id="setupTab" class="btn" type="button">First-time setup</button></div><section id="signin"><form id="signForm"><div class="field"><label>School email</label><input id="signEmail" type="email" required autocomplete="email"></div><div class="field"><label>Password</label><input id="signPassword" type="password" required autocomplete="current-password"></div><button class="btn primary" type="submit">Sign in securely</button><button id="forgot" class="btn" type="button" style="margin-top:10px;width:100%">Forgot password?</button><p id="signMsg" style="margin-top:14px"></p></form></section><section id="setup" hidden><form id="setupForm"><div class="field"><label>School email</label><input id="setupEmail" type="email" required autocomplete="email" placeholder="yourname@school.com"></div><div class="field"><label>Staff ID</label><input id="staffId" required autocomplete="off" placeholder="e.g. TCH-001"></div><div class="field"><label>Create password</label><input id="newPassword" type="password" minlength="8" required autocomplete="new-password"></div><div class="field"><label>Confirm password</label><input id="confirmPassword" type="password" minlength="8" required autocomplete="new-password"></div><button class="btn primary" type="submit">Create password & enter portal</button><p class="hint" style="margin-top:12px">If the school has already registered your teacher record and you do not have a login yet, enter your registered school email and Staff ID. No email code is required.</p><p id="setupMsg"></p></form></section></main><script>
-const $=id=>document.getElementById(id);const show=(id,on)=>$(id).hidden=!on;function message(id,text,ok=false){$(id).textContent=text;$(id).style.color=ok?'#087443':'#b42318'}
-$('signTab').onclick=()=>{show('signin',true);show('setup',false);$('signTab').className='btn primary';$('setupTab').className='btn'};$('setupTab').onclick=()=>{show('signin',false);show('setup',true);$('setupTab').className='btn primary';$('signTab').className='btn'};
-$('signForm').addEventListener('submit',async e=>{e.preventDefault();message('signMsg','Signing in…',true);const{error}=await db.auth.signInWithPassword({email:$('signEmail').value.trim().toLowerCase(),password:$('signPassword').value});if(error){message('signMsg',error.message);return}location.href='index.html'});
-$('forgot').onclick=async()=>{const email=$('signEmail').value.trim();if(!email){message('signMsg','Enter your school email first.');return}message('signMsg','Sending password recovery email…',true);const{error}=await db.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});if(error)message('signMsg',error.message);else message('signMsg','Check your email for the password recovery link.',true)};
-$('setupForm').addEventListener('submit',async e=>{e.preventDefault();const email=$('setupEmail').value.trim().toLowerCase(),staff_id=$('staffId').value.trim(),password=$('newPassword').value,confirm=$('confirmPassword').value;if(password.length<8){message('setupMsg','Password must be at least 8 characters.');return}if(password!==confirm){message('setupMsg','Passwords do not match.');return}message('setupMsg','Checking your teacher record and creating your account…',true);const{data,error}=await db.functions.invoke('teacher-password-setup',{body:{email,staff_id,password}});if(error){message('setupMsg',error.message||'Unable to create your account.');return}if(data?.already_linked){message('setupMsg',data.error||'This account is already set up. Please sign in.');return}if(data?.error){message('setupMsg',data.error);return}message('setupMsg','Password created successfully. Signing you in…',true);const{error:loginError}=await db.auth.signInWithPassword({email,password});if(loginError){message('setupMsg','Password created. Please use the Sign in tab to enter the portal.');return}location.href='index.html'});
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Teacher Login | Laff British Montessori School</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/supabase.js"></script>
+</head>
+<body class="login">
+  <main class="loginbox">
+    <img src="https://i.ibb.co/whtP8S5v/image.png" alt="Laff British Montessori School">
+    <h1>Teacher Portal</h1>
+    <p id="intro">Sign in with your Staff ID and password.</p>
+
+    <div class="tabs" style="display:flex;gap:8px;margin:18px 0">
+      <button id="signTab" class="btn primary" type="button">Sign in</button>
+      <button id="setupTab" class="btn" type="button">First-time setup</button>
+    </div>
+
+    <section id="signin">
+      <form id="signForm">
+        <div class="field">
+          <label for="signStaffId">Staff ID</label>
+          <input id="signStaffId" required autocomplete="username" placeholder="e.g. LBMS002">
+        </div>
+        <div class="field">
+          <label for="signPassword">Password</label>
+          <input id="signPassword" type="password" required autocomplete="current-password">
+        </div>
+        <button class="btn primary" type="submit">Sign in securely</button>
+        <p class="hint" style="margin-top:12px">Your Staff ID is your teacher login. Your school email is kept as your contact email and can be updated later.</p>
+        <p id="signMsg" style="margin-top:14px"></p>
+      </form>
+    </section>
+
+    <section id="setup" hidden>
+      <form id="setupForm">
+        <div class="field">
+          <label for="staffId">Staff ID</label>
+          <input id="staffId" required autocomplete="username" placeholder="e.g. LBMS002">
+        </div>
+        <div class="field">
+          <label for="newPassword">Create password</label>
+          <input id="newPassword" type="password" minlength="8" required autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label for="confirmPassword">Confirm password</label>
+          <input id="confirmPassword" type="password" minlength="8" required autocomplete="new-password">
+        </div>
+        <button class="btn primary" type="submit">Create password & enter portal</button>
+        <p class="hint" style="margin-top:12px">If the school has already registered your teacher record and you do not have a login yet, enter your Staff ID and create your password. No email or Gmail code is required.</p>
+        <p id="setupMsg"></p>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const show = (id, on) => $(id).hidden = !on;
+
+    function message(id, text, ok = false) {
+      $(id).textContent = text;
+      $(id).style.color = ok ? '#087443' : '#b42318';
+    }
+
+    function authEmail(staffId) {
+      return `${staffId.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '')}@teacher.laffbritishschool.com`;
+    }
+
+    $('signTab').onclick = () => {
+      show('signin', true);
+      show('setup', false);
+      $('signTab').className = 'btn primary';
+      $('setupTab').className = 'btn';
+      $('intro').textContent = 'Sign in with your Staff ID and password.';
+    };
+
+    $('setupTab').onclick = () => {
+      show('signin', false);
+      show('setup', true);
+      $('setupTab').className = 'btn primary';
+      $('signTab').className = 'btn';
+      $('intro').textContent = 'Create your teacher password for the first time.';
+    };
+
+    $('signForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const staffId = $('signStaffId').value.trim();
+      const password = $('signPassword').value;
+      if (!staffId || !password) return;
+
+      message('signMsg', 'Signing in…', true);
+      const { error } = await db.auth.signInWithPassword({
+        email: authEmail(staffId),
+        password
+      });
+
+      if (error) {
+        message('signMsg', 'Invalid Staff ID or password. If this is your first login, use First-time setup.');
+        return;
+      }
+
+      location.href = 'index.html';
+    });
+
+    $('setupForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const staff_id = $('staffId').value.trim();
+      const password = $('newPassword').value;
+      const confirm = $('confirmPassword').value;
+
+      if (!staff_id) {
+        message('setupMsg', 'Enter your Staff ID.');
+        return;
+      }
+      if (password.length < 8) {
+        message('setupMsg', 'Password must be at least 8 characters.');
+        return;
+      }
+      if (password !== confirm) {
+        message('setupMsg', 'Passwords do not match.');
+        return;
+      }
+
+      message('setupMsg', 'Checking your Staff ID and creating your account…', true);
+
+      const { data, error } = await db.functions.invoke('teacher-password-setup', {
+        body: { staff_id, password }
+      });
+
+      if (error) {
+        message('setupMsg', error.message || 'Unable to create your account.');
+        return;
+      }
+      if (data?.already_linked) {
+        message('setupMsg', data.error || 'This teacher account is already set up. Please use Sign in.');
+        return;
+      }
+      if (data?.error) {
+        message('setupMsg', data.error);
+        return;
+      }
+
+      message('setupMsg', 'Password created successfully. Signing you in…', true);
+
+      const { error: loginError } = await db.auth.signInWithPassword({
+        email: authEmail(staff_id),
+        password
+      });
+
+      if (loginError) {
+        message('setupMsg', 'Password created. Please use the Sign in tab with your Staff ID.');
+        return;
+      }
+
+      location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>
