@@ -19,50 +19,69 @@
     <form id="signForm">
       <div class="field">
         <label for="email">School Email</label>
-        <input id="email" type="email" required autocomplete="email" placeholder="teacher@school.com">
+        <input id="email" type="email" required autocomplete="email" placeholder="teacher@laffbritishmontesorrischool.com">
       </div>
       <div class="field">
-        <label for="schoolId">LBS School ID</label>
-        <input id="schoolId" required autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="e.g. LBS001">
+        <label for="schoolId">Staff ID</label>
+        <input id="schoolId" required autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="e.g. TCH-123456">
+      </div>
+      <div class="field" id="codeField" hidden>
+        <label for="code">Confirmation Code</label>
+        <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter the 6-digit code">
       </div>
       <button id="signButton" class="btn primary" type="submit">Sign in securely</button>
-      <p class="hint" style="margin-top:12px">Use the school email already registered by the school and your assigned LBS school ID.</p>
+      <p class="hint" id="loginHint" style="margin-top:12px">Use your school email and Staff ID. If your account requires confirmation, a code will be emailed before dashboard access.</p>
       <p id="signMsg" style="margin-top:14px"></p>
     </form>
   </main>
 
   <script>
     const $ = id => document.getElementById(id);
+    let awaitingConfirmation=false;
 
-    function message(text, ok = false) {
-      $('signMsg').textContent = text;
-      $('signMsg').style.color = ok ? '#087443' : '#b42318';
+    function message(text, ok=false) {
+      $('signMsg').textContent=text;
+      $('signMsg').style.color=ok?'#087443':'#b42318';
     }
 
-    $('signForm').addEventListener('submit', async e => {
+    $('signForm').addEventListener('submit', async e=>{
       e.preventDefault();
-      const email = $('email').value.trim().toLowerCase();
-      const school_id = $('schoolId').value.trim().toUpperCase();
-      if (!email || !school_id) return;
+      const email=$('email').value.trim().toLowerCase();
+      const school_id=$('schoolId').value.trim().toUpperCase();
+      const verification=$('code').value.trim();
+      if(!email||!school_id)return;
 
-      $('signButton').disabled = true;
-      $('signButton').textContent = 'Checking details…';
-      message('Verifying your school email and LBS school ID…', true);
+      $('signButton').disabled=true;
+      $('signButton').textContent=awaitingConfirmation?'Verifying code…':'Checking details…';
+      message(awaitingConfirmation?'Checking your confirmation code…':'Verifying your school email and Staff ID…',true);
 
-      const { data, error } = await db.functions.invoke('teacher-login', {
-        body: { email, school_id }
-      });
+      const {data,error}=await db.functions.invoke('teacher-login',{body:{
+        email,school_id,verification_code:verification
+      }});
 
-      if (error || !data?.action_link) {
-        $('signButton').disabled = false;
-        $('signButton').textContent = 'Sign in securely';
-        message(data?.error || error?.message || 'Unable to sign you in. Check your school email and LBS school ID.');
+      if(error||!data?.ok){
+        $('signButton').disabled=false;
+        $('signButton').textContent='Sign in securely';
+        if(data?.requires_confirmation){
+          awaitingConfirmation=true;
+          $('codeField').hidden=false;
+          $('code').focus();
+          message(data.message||'A confirmation code was sent to your email. Enter it to continue.');
+        }else{
+          message(data?.error||error?.message||'Unable to sign you in.');
+        }
         return;
       }
 
-      message('Details verified. Opening your secure teacher workspace…', true);
-      window.location.replace(data.action_link);
+      message('Login verified. Opening your teacher dashboard…',true);
+      const {data:sessionData}=await db.auth.getSession();
+      if(!sessionData?.session){
+        message('Your login was verified, but no session was created. Please try again.');
+        $('signButton').disabled=false;
+        $('signButton').textContent='Sign in securely';
+        return;
+      }
+      window.location.replace('index.html');
     });
-  </script>
-</body>
+  </script></body>
 </html>
