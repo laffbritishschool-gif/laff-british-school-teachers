@@ -68,7 +68,7 @@
           $('code').focus();
           message(data.message||'A confirmation code was sent to your email. Enter it to continue.');
         }else{
-          message(data?.error||error?.message||'Unable to sign you in.');
+          message(data?.error||data?.message||error?.message||'Unable to sign you in.');
         }
         return;
       }
