@@ -37,56 +37,117 @@
 
   <script>
     const $ = id => document.getElementById(id);
-    let awaitingConfirmation=false;
+    let awaitingConfirmation = false;
 
-    function message(text, ok=false) {
-      $('signMsg').textContent=text;
-      $('signMsg').style.color=ok?'#087443':'#b42318';
+    function message(text, ok = false) {
+      $('signMsg').textContent = text;
+      $('signMsg').style.color = ok ? '#087443' : '#b42318';
     }
 
-    $('signForm').addEventListener('submit', async e=>{
-      e.preventDefault();
-      const email=$('email').value.trim().toLowerCase();
-      const school_id=$('schoolId').value.trim().toUpperCase();
-      const verification=$('code').value.trim();
-      if(!email||!school_id)return;
+    async function getTeacher(email, schoolId) {
+      const { data, error } = await db
+        .from('teachers')
+        .select('id,user_id,staff_id,full_name,school_email,email,is_active,email_confirmation_mode,email_confirmed')
+        .eq('staff_id', schoolId)
+        .maybeSingle();
 
-      $('signButton').disabled=true;
-      $('signButton').textContent=awaitingConfirmation?'Verifying code…':'Checking details…';
-      message(awaitingConfirmation?'Checking your confirmation code…':'Verifying your school email and Staff ID…',true);
-
-      const {data,error}=await db.functions.invoke('teacher-login',{body:{
-        email,school_id,verification_code:verification
-      }});
-
-      if(error||!data?.ok){
-        $('signButton').disabled=false;
-        $('signButton').textContent='Sign in securely';
-        if(data?.requires_confirmation){
-          awaitingConfirmation=true;
-          $('codeField').hidden=false;
-          $('code').focus();
-          message(data.message||'A confirmation code was sent to your email. Enter it to continue.');
-        }else{
-          message(data?.error||data?.message||error?.message||'Unable to sign you in.');
-        }
-        return;
+      if (error) throw new Error('Unable to check the teacher account.');
+      if (!data || !data.is_active || (data.school_email || data.email || '').trim().toLowerCase() !== email) {
+        throw new Error('The School Email and Staff ID do not match an active teacher account.');
       }
+      return data;
+    }
 
-      if(data?.session?.access_token){
-        const {error:sessionError}=await db.auth.setSession({
-          access_token:data.session.access_token,
-          refresh_token:data.session.refresh_token
-        });
-        if(sessionError){
-          message(sessionError.message||'Unable to create your login session.');
-          $('signButton').disabled=false;
-          $('signButton').textContent='Sign in securely';
+    $('signForm').addEventListener('submit', async e => {
+      e.preventDefault();
+
+      const email = $('email').value.trim().toLowerCase();
+      const schoolId = $('schoolId').value.trim().toUpperCase();
+      const verification = $('code').value.trim();
+
+      if (!email || !schoolId) return;
+
+      $('signButton').disabled = true;
+      $('signButton').textContent = awaitingConfirmation ? 'Verifying code…' : 'Checking details…';
+
+      try {
+        const teacher = await getTeacher(email, schoolId);
+
+        if (!teacher.user_id) {
+          throw new Error('Your teacher account has not been prepared yet. Please contact the school administrator.');
+        }
+
+        const mode = String(teacher.email_confirmation_mode || 'TEACHER').toUpperCase();
+
+        if (mode === 'ADMIN' && !teacher.email_confirmed) {
+          throw new Error('Your account is awaiting administrator confirmation.');
+        }
+
+        if (mode !== 'AUTO' && !teacher.email_confirmed && !verification) {
+          const { error } = await db.auth.signInWithOtp({
+            email,
+            options: { shouldCreateUser: false }
+          });
+
+          if (error) throw new Error(error.message);
+
+          awaitingConfirmation = true;
+          $('codeField').hidden = false;
+          $('code').focus();
+          message('A 6-digit confirmation code has been sent to your School Email.', false);
+          $('signButton').disabled = false;
+          $('signButton').textContent = 'Verify code';
           return;
         }
+
+        if (mode !== 'AUTO' && !teacher.email_confirmed) {
+          const { data: verified, error } = await db.auth.verifyOtp({
+            email,
+            token: verification,
+            type: 'email'
+          });
+
+          if (error || !verified?.user) {
+            throw new Error(error?.message || 'That confirmation code is invalid or expired.');
+          }
+
+          if (verified.user.id !== teacher.user_id) {
+            await db.auth.signOut();
+            throw new Error('The confirmation code does not belong to this teacher account.');
+          }
+
+          const { error: updateError } = await db
+            .from('teachers')
+            .update({
+              email_confirmed: true,
+              onboarding_status: 'READY',
+              email_confirmation_code_hash: null,
+              email_confirmation_expires_at: null
+            })
+            .eq('id', teacher.id);
+
+          if (updateError) throw new Error('The account could not be confirmed.');
+
+          // Keep the verified Supabase session for the dashboard.
+          message('Confirmation successful. Opening your dashboard…', true);
+          window.location.replace('index.html');
+          return;
+        }
+
+        // AUTO-confirmed accounts still need a browser session. The teacher account
+        // must already have an Auth session, otherwise ask the admin to provision it.
+        const { data: sessionData } = await db.auth.getSession();
+        if (!sessionData?.session) {
+          throw new Error('Your teacher account is confirmed, but its sign-in session is not ready. Please ask the administrator to provision the account again.');
+        }
+
+        message('Login successful. Opening your dashboard…', true);
+        window.location.replace('index.html');
+      } catch (err) {
+        message(err?.message || 'Unable to sign you in.');
+        $('signButton').disabled = false;
+        $('signButton').textContent = awaitingConfirmation ? 'Verify code' : 'Sign in securely';
       }
-      message('Login verified. Opening your teacher dashboard…',true);
-      window.location.replace('index.html');
     });
-  </script></body>
+  </script>dy>
 </html>
