@@ -73,6 +73,18 @@
         return;
       }
 
+      if(data?.session?.access_token){
+        const {error:sessionError}=await db.auth.setSession({
+          access_token:data.session.access_token,
+          refresh_token:data.session.refresh_token
+        });
+        if(sessionError){
+          message(sessionError.message||'Unable to create your login session.');
+          $('signButton').disabled=false;
+          $('signButton').textContent='Sign in securely';
+          return;
+        }
+      }
       message('Login verified. Opening your teacher dashboard…',true);
       window.location.replace('index.html');
     });
