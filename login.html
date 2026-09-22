@@ -56,7 +56,7 @@
       message(awaitingConfirmation?'Checking your confirmation code…':'Verifying your school email and Staff ID…',true);
 
       const {data,error}=await db.functions.invoke('teacher-login',{body:{
-        email,school_id,password,verification_code:verification
+        email,school_id,verification_code:verification
       }});
 
       if(error||!data?.ok){
