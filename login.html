@@ -30,7 +30,7 @@
         <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter the 6-digit code">
       </div>
       <button id="signButton" class="btn primary" type="submit">Sign in securely</button>
-      <p class="hint" id="loginHint" style="margin-top:12px">Use your school email and Staff ID. If your account requires confirmation, a code will be emailed before dashboard access.</p>
+      <p class="hint" id="loginHint" style="margin-top:12px">Use your School Email and Staff ID. If confirmation is required, a 6-digit code will be emailed before dashboard access.</p>
       <p id="signMsg" style="margin-top:14px"></p>
     </form>
   </main>
@@ -73,14 +73,7 @@
         return;
       }
 
-      message('Login verified. Signing you in…',true);
-      const {data:signInData,error:signInError}=await db.auth.signInWithPassword({email,password});
-      if(signInError||!signInData?.session){
-        message(signInError?.message||'Your account was verified, but sign-in could not be completed.');
-        $('signButton').disabled=false;
-        $('signButton').textContent='Sign in securely';
-        return;
-      }
+      message('Login verified. Opening your teacher dashboard…',true);
       window.location.replace('index.html');
     });
   </script></body>
