@@ -14,7 +14,7 @@
     <img src="https://i.ibb.co/whtP8S5v/image.png" alt="Laff British Montessori School">
     <div class="eyebrow" style="display:flex;width:max-content;margin:0 auto 10px">LBS Teacher Access</div>
     <h1>Teacher Portal</h1>
-    <p id="intro">Sign in with your registered school email and LBS school ID.</p>
+    <p id="intro">Sign in with your registered school email and LBS school ID. The confirmation code is sent to your Secondary / Personal Email.</p>
 
     <form id="signForm">
       <div class="field">
@@ -31,7 +31,7 @@
       </div>
       <button id="signButton" class="btn primary" type="submit">Sign in securely</button>
       <button id="resendButton" class="btn" type="button" hidden style="width:100%;margin-top:10px">↻ Send confirmation code again</button>
-      <p class="hint" id="loginHint" style="margin-top:12px">For teacher confirmation, the portal automatically sends a 6-digit code to the registered School Email. Enter the code above to continue.</p>
+      <p class="hint" id="loginHint" style="margin-top:12px">For teacher confirmation, the portal automatically sends a 6-digit code to your registered Secondary / Personal Email. Your School Email remains your teacher ID on the portal.</p>
       <p id="signMsg" style="margin-top:14px"></p>
     </form>
   </main>
@@ -46,10 +46,10 @@
       $('signMsg').style.color = ok ? '#087443' : '#b42318';
     }
 
-    async function getTeacher(email, schoolId) {
+    async function getTeacher(email: confirmationEmail, schoolId) {
       const { data, error } = await db
         .from('teachers')
-        .select('id,user_id,staff_id,full_name,school_email,email,is_active,email_confirmation_mode,email_confirmed')
+        .select('id,user_id,staff_id,full_name,school_email,email,secondary_email,is_active,email_confirmation_mode,email_confirmed')
         .eq('staff_id', schoolId)
         .maybeSingle();
 
@@ -60,8 +60,8 @@
       return data;
     }
 
-    async function sendConfirmationCode(email){const address=String(email||'').trim().toLowerCase();if(!address)throw new Error('Enter your School Email first.');const {error}=await db.auth.signInWithOtp({email:address,options:{shouldCreateUser:false}});if(error)throw new Error(error.message);confirmationEmail=address;return address}
-    $('resendButton').addEventListener('click', async()=>{if(!awaitingConfirmation)return;$('resendButton').disabled=true;$('resendButton').textContent='Sending…';try{await sendConfirmationCode(confirmationEmail||$('email').value.trim().toLowerCase());message('A new 6-digit confirmation code has been sent to your School Email.')}catch(err){message(err?.message||'Could not resend the confirmation code.')}finally{$('resendButton').disabled=false;$('resendButton').textContent='↻ Send confirmation code again'}})
+    async function sendConfirmationCode(email){const address=String(email||'').trim().toLowerCase();if(!address)throw new Error('A registered secondary email is required for confirmation.');const {error}=await db.auth.signInWithOtp({email:address,options:{shouldCreateUser:false}});if(error)throw new Error(error.message);confirmationEmail=address;return address}
+    $('resendButton').addEventListener('click', async()=>{if(!awaitingConfirmation)return;$('resendButton').disabled=true;$('resendButton').textContent='Sending…';try{await sendConfirmationCode(confirmationEmail||'');message('A new 6-digit confirmation code has been sent to your registered secondary email.')}catch(err){message(err?.message||'Could not resend the confirmation code.')}finally{$('resendButton').disabled=false;$('resendButton').textContent='↻ Send confirmation code again'}})
 
     $('signForm').addEventListener('submit', async e => {
       e.preventDefault();
@@ -83,19 +83,23 @@
         }
 
         const mode = String(teacher.email_confirmation_mode || 'TEACHER').toUpperCase();
+        const secondaryEmail = String(teacher.secondary_email || '').trim().toLowerCase();
+        if (!secondaryEmail) throw new Error('A registered Secondary / Personal Email is required for email confirmation.');
 
         if (mode === 'ADMIN' && !teacher.email_confirmed) {
           throw new Error('Your account is awaiting administrator confirmation.');
         }
 
         if (mode !== 'AUTO' && !teacher.email_confirmed && !verification) {
-          await sendConfirmationCode(email);
+          const confirmationAddress = String(teacher.secondary_email || '').trim().toLowerCase();
+          if (!confirmationAddress) throw new Error('Your account does not have a secondary email address. Please contact the school administrator.');
+          await sendConfirmationCode(confirmationAddress);
           awaitingConfirmation = true;
-          confirmationEmail = email;
+          confirmationEmail = String(teacher.secondary_email || '').trim().toLowerCase();
           $('codeField').hidden = false;
           $('resendButton').hidden = false;
           $('code').focus();
-          message('A 6-digit confirmation code has been sent to your School Email.', false);
+          message('A 6-digit confirmation code has been sent to your registered secondary email.', false);
           $('signButton').disabled = false;
           $('signButton').textContent = 'Verify code';
           return;
@@ -103,7 +107,7 @@
 
         if (mode !== 'AUTO' && !teacher.email_confirmed) {
           const { data: verified, error } = await db.auth.verifyOtp({
-            email,
+            email: confirmationEmail,
             token: verification,
             type: 'email'
           });
