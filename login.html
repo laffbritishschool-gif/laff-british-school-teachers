@@ -30,7 +30,8 @@
         <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter the 6-digit code">
       </div>
       <button id="signButton" class="btn primary" type="submit">Sign in securely</button>
-      <p class="hint" id="loginHint" style="margin-top:12px">Use your School Email and Staff ID. If confirmation is required, a 6-digit code will be emailed before dashboard access.</p>
+      <button id="resendButton" class="btn" type="button" hidden style="width:100%;margin-top:10px">↻ Send confirmation code again</button>
+      <p class="hint" id="loginHint" style="margin-top:12px">For teacher confirmation, the portal automatically sends a 6-digit code to the registered School Email. Enter the code above to continue.</p>
       <p id="signMsg" style="margin-top:14px"></p>
     </form>
   </main>
@@ -38,6 +39,7 @@
   <script>
     const $ = id => document.getElementById(id);
     let awaitingConfirmation = false;
+    let confirmationEmail = '';
 
     function message(text, ok = false) {
       $('signMsg').textContent = text;
@@ -57,6 +59,9 @@
       }
       return data;
     }
+
+    async function sendConfirmationCode(email){const address=String(email||'').trim().toLowerCase();if(!address)throw new Error('Enter your School Email first.');const {error}=await db.auth.signInWithOtp({email:address,options:{shouldCreateUser:false}});if(error)throw new Error(error.message);confirmationEmail=address;await getTeacher(address,$('schoolId').value.trim().toUpperCase());await getTeacher(address,$('schoolId').value.trim().toUpperCase());await getTeacher(address,$('schoolId').value.trim().toUpperCase());return address}
+    $('resendButton').addEventListener('click', async()=>{if(!awaitingConfirmation)return;$('resendButton').disabled=true;$('resendButton').textContent='Sending…';try{await sendConfirmationCode(confirmationEmail||$('email').value.trim().toLowerCase());message('A new 6-digit confirmation code has been sent to your School Email.')}catch(err){message(err?.message||'Could not resend the confirmation code.')}finally{$('resendButton').disabled=false;$('resendButton').textContent='↻ Send confirmation code again'}})
 
     $('signForm').addEventListener('submit', async e => {
       e.preventDefault();
@@ -84,15 +89,11 @@
         }
 
         if (mode !== 'AUTO' && !teacher.email_confirmed && !verification) {
-          const { error } = await db.auth.signInWithOtp({
-            email,
-            options: { shouldCreateUser: false }
-          });
-
-          if (error) throw new Error(error.message);
-
+          await sendConfirmationCode(email);
           awaitingConfirmation = true;
+          confirmationEmail = email;
           $('codeField').hidden = false;
+          $('resendButton').hidden = false;
           $('code').focus();
           message('A 6-digit confirmation code has been sent to your School Email.', false);
           $('signButton').disabled = false;
@@ -149,5 +150,6 @@
         $('signButton').textContent = awaitingConfirmation ? 'Verify code' : 'Sign in securely';
       }
     });
-  </script>dy>
+  </script>
+</body>
 </html>
