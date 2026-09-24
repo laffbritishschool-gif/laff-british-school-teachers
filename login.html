@@ -46,7 +46,7 @@
       $('signMsg').style.color = ok ? '#087443' : '#b42318';
     }
 
-    async function getTeacher(email: confirmationEmail, schoolId) {
+    async function getTeacher(email, schoolId) {
       const { data, error } = await db
         .from('teachers')
         .select('id,user_id,staff_id,full_name,school_email,email,secondary_email,is_active,email_confirmation_mode,email_confirmed')
