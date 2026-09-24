@@ -60,7 +60,7 @@
       return data;
     }
 
-    async function sendConfirmationCode(email){const address=String(email||'').trim().toLowerCase();if(!address)throw new Error('Enter your School Email first.');const {error}=await db.auth.signInWithOtp({email:address,options:{shouldCreateUser:false}});if(error)throw new Error(error.message);confirmationEmail=address;await getTeacher(address,$('schoolId').value.trim().toUpperCase());await getTeacher(address,$('schoolId').value.trim().toUpperCase());await getTeacher(address,$('schoolId').value.trim().toUpperCase());return address}
+    async function sendConfirmationCode(email){const address=String(email||'').trim().toLowerCase();if(!address)throw new Error('Enter your School Email first.');const {error}=await db.auth.signInWithOtp({email:address,options:{shouldCreateUser:false}});if(error)throw new Error(error.message);confirmationEmail=address;return address}
     $('resendButton').addEventListener('click', async()=>{if(!awaitingConfirmation)return;$('resendButton').disabled=true;$('resendButton').textContent='Sending…';try{await sendConfirmationCode(confirmationEmail||$('email').value.trim().toLowerCase());message('A new 6-digit confirmation code has been sent to your School Email.')}catch(err){message(err?.message||'Could not resend the confirmation code.')}finally{$('resendButton').disabled=false;$('resendButton').textContent='↻ Send confirmation code again'}})
 
     $('signForm').addEventListener('submit', async e => {
