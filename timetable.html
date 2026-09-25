@@ -43,9 +43,9 @@ async function init(){
  if(pe||!p?.is_active||p.role!=='TEACHER')return location.href='login.html';
  $('teacher').textContent=p.full_name||'Teacher';
  const {data:t,error:te}=await db.from('teachers').select('id').eq('user_id',user.id).single();if(te||!t){showError('Teacher profile is not linked.');return}teacher=t;
- const[s,tr,a]=await Promise.all([db.from('academic_sessions').select('id,name,is_current,starts_on').order('starts_on',{ascending:false}),db.from('terms').select('id,session_id,name,is_current').order('name'),db.from('class_subjects').select('class_id,classes(id,name,level)').eq('teacher_id',t.id)]);
- if(s.error||tr.error||a.error){showError((s.error||tr.error||a.error).message);return}
- sessions=s.data||[];terms=tr.data||[];classes=[...new Map((a.data||[]).filter(x=>x.classes).map(x=>[x.class_id,x.classes])).values()];
+ const[s,tr,a,ta]=await Promise.all([db.from('academic_sessions').select('id,name,is_current,starts_on').order('starts_on',{ascending:false}),db.from('terms').select('id,session_id,name,is_current').order('name'),db.from('class_subjects').select('class_id,classes(id,name,level)').eq('teacher_id',t.id),db.from('timetables').select('class_id,classes(id,name,level)').eq('teacher_id',t.id)]);
+ if(s.error||tr.error||a.error||ta.error){showError((s.error||tr.error||a.error||ta.error).message);return}
+ sessions=s.data||[];terms=tr.data||[];const classRows=[...(a.data||[]),...(ta.data||[])];classes=[...new Map(classRows.filter(x=>x.classes).map(x=>[x.class_id,x.classes])).values()];
  $('session').innerHTML=sessions.map(x=>'<option value="'+x.id+'">'+esc(x.name)+(x.is_current?' · Current':'')+'</option>').join('');
  const current=sessions.find(x=>x.is_current);if(current)$('session').value=current.id;fillTerms();
  $('class').innerHTML='<option value="">All my assigned classes</option>'+classes.map(x=>'<option value="'+x.id+'">'+esc(x.name)+(x.level?' · '+esc(x.level):'')+'</option>').join('');
